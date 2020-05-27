@@ -1,2 +1,4 @@
-def func1():
-  print('func1')
+import logging
+
+def sample():
+  logging.error('Error')
