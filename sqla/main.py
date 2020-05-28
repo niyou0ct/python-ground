@@ -1,28 +1,51 @@
+from sqlalchemy import Table, Column, Integer, ForeignKey, String
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 engine = create_engine('sqlite:///:memory:')
 
-with engine.connect() as con:
-  con.execute("DROP TABLE IF EXISTS USERS")
-  con.execute("CREATE TABLE USERS(id INTEGER PRIMARY KEY, name TEXT, age INTEGER)")
+Base = declarative_base()
 
-  rows = ({'id': 1, 'name': 'Sato', 'age': 31},
-          {"id": 2, "name": "Suzuki", "age": 18},
-          {"id": 3, "name": "Yamada", "age": 40},
-          {"id": 4, "name": "Kuro", "age": 30},
-          )
+class User(Base):
+  __tablename__ = 'users'
 
-  for row in rows:
-    con.execute("INSERT INTO USERS (id, name, age) VALUES(:id, :name, :age)", **row)
+  id = Column(Integer, primary_key=True)
+  name = Column(String)
+  age = Column(Integer)
 
-  rows = con.execute("SELECT * FROM USERS")
-  for row in rows:
-    print(row)
+  posts = relationship("Post", backref="users")
 
-  con.execute("UPDATE USERS SET age=42 WHERE id = :id", **{'id': 3})
-  con.execute("DELETE FROM USERS WHERE id = :id", **{'id': 4})
+class Post(Base):
+  __tablename__ = 'posts'
 
-  print('***** After the update *****')
+  id = Column(Integer, primary_key=True)
+  users_id = Column(Integer, ForeignKey('users.id'))
+  title = Column(String)
+  body = Column(Integer)
 
-  rows = con.execute("SELECT * FROM USERS")
-  for row in rows:
-    print(row)
+  user = relationship("User")
+
+Base.metadata.create_all(engine)
+
+Session = sessionmaker(bind=engine)
+session = Session()
+
+session.add(User(id=1, name="Suzuki", age=19))
+session.add(User(id=2, name="Tanaka", age=21))
+session.add(User(id=3, name="Sato", age=21))
+
+session.add(Post(users_id=1, title="朝の体操", body="ラジオ体操で元気いっぱい"))
+session.add(Post(users_id=1, title="今日の夕食", body="カレーラスがとても美味しかった。"))
+session.add(Post(users_id=2, title="仕事", body="今日はDjangoでAPI作成。"))
+session.add(Post(users_id=2, title="Python楽しい", body="Python楽しいですよね！！"))
+session.commit()
+
+users = session.query(User).join(Post, User.id == Post.users_id).all()
+
+for user in users:
+  print("%s's post" % (user.name))
+  for post in user.posts:
+    print("|- Title: %s" % (post.title))
+    print('')
